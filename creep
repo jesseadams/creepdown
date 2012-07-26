@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+command=$1
+path=${2%/}
+
+function display_usage(){
+  echo "Usage: creep [watch|listen] [/path/to/markdown/dir]"
+  exit 2;
+}
+
+if [ -z "$command" ] || [ -z "$path" ];then
+  display_usage
+fi
+
+if [ "$command" != "watch" ] && [ "$command" != "rebuild" ];then
+  display_usage
+fi
+
+if [[ "$path" != *markdown* ]]; then
+  echo "Please pass in path to markdown directory!"
+  exit 2;
+fi
+
+BASE_PATH=`dirname $path`
+
+function rebuild_file(){
+  file=$1
+  filename=`basename $file`
+  extension=${file##*.}
+
+  if [ "$extension" != "md" ] && [ "$extension" != "markdown" ]; then
+    echo "Ignoring $file (Not a markdown file)..."
+    return 0
+  fi
+
+  relative_path=`dirname $file | sed -e "s|$path||g"`
+
+  if [ "$relative_path" == 'markdown' ]; then
+    base_path=""
+    relative_path=""
+  else
+    base_path=`dirname $file | sed -e "s|markdown/$relative_path||g"`
+  fi
+
+  filename_without_ext=`echo $filename | awk -F '.' '{ print $1 }'`
+  destination_dir="$BASE_PATH/html/$relative_path"
+  file_to_update=`echo "$destination_dir/$filename_without_ext.html" | sed -e 's/\/\//\//g'`
+  
+  if [ ! -d "$destination_dir" ]; then
+    mkdir -p "$destination_dir"
+  fi
+
+  echo "$file -> $file_to_update"
+  cat $BASE_PATH/templates/header.html > $file_to_update
+  markdown $file >> $file_to_update
+  cat $BASE_PATH/templates/footer.html >> $file_to_update
+}
+
+if [ "$command" == "watch" ];then
+  while [ true ]; do
+    echo "Watching $path..."
+    file=`inotifywait -qr $path --exclude 'swp$' --event modify | awk '{ print $1$3 }'`
+    if [ "$?" == "0" ];then
+      if [ "$file" == "" ]; then
+        echo "No files found."
+        exit 2
+      else
+        rebuild_file $file
+      fi
+    else
+      echo "inotify error!"
+      exit 2
+    fi
+  done
+else
+  rm -rf html/*
+  for file in `find $path -type f`; do
+    rebuild_file $file
+  done
+fi
