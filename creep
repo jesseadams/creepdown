@@ -3,7 +3,9 @@ command=$1
 path=${2%/}
 
 function display_usage(){
-  echo "Usage: creep [watch|listen] [/path/to/markdown/dir]"
+  echo "Usage: creep [watch|rebuild] [/path/to/markdown/dir]"
+  echo "    rebuild    Recursively rebuilds HTML from markdown"
+  echo "    watch      Automatically rebuild files when they change"
   exit 2;
 }
 
